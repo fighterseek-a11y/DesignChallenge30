@@ -1,0 +1,841 @@
+name: Build debug APK
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create project files
+        run: |
+          mkdir -p app app/src/main app/src/main/java/com/designchallenge30 app/src/main/java/com/designchallenge30/data app/src/main/java/com/designchallenge30/ui app/src/main/java/com/designchallenge30/ui/theme app/src/main/res/values gradle
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              alias(libs.plugins.android.application)
+              alias(libs.plugins.kotlin.android)
+              alias(libs.plugins.kotlin.compose)
+          }
+
+          android {
+              namespace = "com.designchallenge30"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.designchallenge30"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              buildFeatures {
+                  compose = true
+              }
+          }
+
+          dependencies {
+              implementation(platform(libs.androidx.compose.bom))
+              implementation(libs.androidx.core.ktx)
+              implementation(libs.androidx.compose.ui)
+              implementation(libs.androidx.compose.material3)
+              implementation(libs.androidx.activity.compose)
+              implementation(libs.androidx.lifecycle.runtime.compose)
+              implementation(libs.androidx.lifecycle.viewmodel.compose)
+              implementation(libs.androidx.navigation.compose)
+              implementation(libs.androidx.datastore.preferences)
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="true"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.DesignChallenge30">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+          cat > app/src/main/java/com/designchallenge30/MainActivity.kt <<'EOF'
+          package com.designchallenge30
+
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import com.designchallenge30.ui.AppNav
+          import com.designchallenge30.ui.theme.DesignTheme
+
+          class MainActivity : ComponentActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContent {
+                      DesignTheme { AppNav() }
+                  }
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/designchallenge30/data/Challenge.kt <<'EOF'
+          package com.designchallenge30.data
+
+          enum class Category(val title: String) {
+              POSTERS("Постеры"), TYPE("Типографика"), PREVIEW("Превью"), COVERS("Обложки"),
+              INFO("Инфографика"), SOCIAL("Оформление соцсетей"), ADS("Рекламные креативы"), ART("Арты")
+          }
+
+          enum class Difficulty(val title: String) { EASY("Лёгкая"), MEDIUM("Средняя"), HARD("Сложная") }
+
+          data class Challenge(
+              val id: Int,
+              val title: String,
+              val description: String,
+              val category: Category,
+              val difficulty: Difficulty,
+              val criteria: List<String>
+          )
+
+          private fun c(id: Int, t: String, d: String, cat: Category, df: Difficulty, vararg crit: String) =
+              Challenge(id, t, d, cat, df, crit.toList())
+
+          private val E = Difficulty.EASY
+          private val M = Difficulty.MEDIUM
+          private val H = Difficulty.HARD
+
+          val CHALLENGES: List<Challenge> = listOf(
+              c(1, "Афиша музыкального фестиваля", "Сделайте афишу летнего фестиваля с ясной иерархией текста.", Category.POSTERS, E, "Заметный главный заголовок", "Указаны дата и место", "Не более двух шрифтов"),
+              c(2, "Киноплакат в стиле ретро", "Плакат вымышленного фильма 80-х.", Category.POSTERS, M, "Единая цветовая палитра", "Выделен главный образ", "Текстовый блок читаем"),
+              c(3, "Постер в швейцарском стиле", "Афиша выставки на модульной сетке.", Category.POSTERS, H, "Используется модульная сетка", "Асимметричная композиция", "Сильный контраст размеров текста"),
+              c(4, "Мотивационный плакат", "Плакат с одной сильной фразой.", Category.POSTERS, E, "Фраза читается за 3 секунды", "Достаточно воздуха вокруг текста", "Один акцентный цвет"),
+              c(5, "Плакат из одной буквы", "Сделайте одну букву главным героем композиции.", Category.TYPE, E, "Буква узнаваема", "Работа с масштабом и кадрированием", "Ограниченная палитра"),
+              c(6, "Цитата как шрифтовая композиция", "Оформите цитату, играя размером и насыщенностью шрифта.", Category.TYPE, M, "Минимум три начертания или размера", "Читаемый порядок чтения", "Выровнены межстрочные интервалы"),
+              c(7, "Шрифтовой паттерн", "Соберите бесшовный узор из слов и символов.", Category.TYPE, H, "Узор повторяется без швов", "Есть ритм и плотность", "Текст не мешает восприятию узора"),
+              c(8, "Логотип-надпись для кафе", "Нарисуйте логотип из букв для вымышленного кафе.", Category.TYPE, M, "Подогнан кернинг", "Логотип читается в малом размере", "Есть чёрно-белая версия"),
+              c(9, "Превью обзора гаджета", "Яркая обложка для обзора смартфона.", Category.PREVIEW, E, "Крупный предмет в кадре", "Короткий текст до 4 слов", "Высокий контраст"),
+              c(10, "Превью выпуска подкаста", "Квадратная обложка выпуска с гостем.", Category.PREVIEW, M, "Лицо или образ гостя заметны", "Название выпуска читается в миниатюре", "Единый стиль серии"),
+              c(11, "Превью рецепта", "Аппетитная обложка для кулинарной статьи.", Category.PREVIEW, E, "Блюдо в фокусе", "Тёплая цветовая гамма", "Заголовок не перекрывает блюдо"),
+              c(12, "Превью игрового стрима", "Динамичная обложка трансляции.", Category.PREVIEW, M, "Есть ощущение движения", "Крупный заголовок", "Читается на экране телефона"),
+              c(13, "Обложка музыкального альбома", "Квадратная обложка для вымышленного альбома.", Category.COVERS, M, "Название и исполнитель различимы", "Один сильный образ", "Работает в размере 100×100 пикселей"),
+              c(14, "Обложка книги", "Обложка для романа выбранного жанра.", Category.COVERS, M, "Жанр считывается с первого взгляда", "Продуманы корешок или формат", "Шрифт подходит жанру"),
+              c(15, "Обложка плейлиста", "Минималистичная обложка для настроения «ночная дорога».", Category.COVERS, E, "Не более трёх элементов", "Передано настроение", "Название читается"),
+              c(16, "Обложка журнала", "Титульная страница журнала о дизайне.", Category.COVERS, H, "Название журнала доминирует", "Три анонса разной важности", "Герой обложки не закрыт текстом"),
+              c(17, "Инфографика о режиме сна", "Покажите распорядок и фазы сна наглядно.", Category.INFO, M, "Данные визуализированы, а не перечислены", "Понятная легенда", "Единый стиль иконок"),
+              c(18, "Таймлайн изобретения", "Хронология истории любого изобретения.", Category.INFO, M, "Минимум пять событий", "Чёткая последовательность", "Выделено ключевое событие"),
+              c(19, "Сравнение двух городов", "Инфографика-сравнение по пяти параметрам.", Category.INFO, H, "Одинаковая шкала для обоих городов", "Цвета различают города", "Есть вывод одной строкой"),
+              c(20, "Набор пиктограмм", "Нарисуйте шесть иконок в единой стилистике.", Category.INFO, E, "Одинаковая толщина линий", "Единая сетка и размер", "Иконки понятны без подписей"),
+              c(21, "Шаблон поста для блога", "Шаблон квадратного поста для повторного использования.", Category.SOCIAL, E, "Есть зона под заголовок и подпись", "Фирменные цвета", "Пример с готовым текстом"),
+              c(22, "Карусель из 5 слайдов", "Образовательная карусель для соцсети.", Category.SOCIAL, M, "Общий фон перетекает между слайдами", "Первый слайд цепляет", "Последний слайд содержит призыв"),
+              c(23, "Аватар и шапка профиля", "Комплект оформления профиля эксперта.", Category.SOCIAL, M, "Аватар читается в кружке", "Шапка не теряет важное при обрезке", "Единая цветовая схема"),
+              c(24, "Иконки для актуальных историй", "Набор из шести обложек для разделов профиля.", Category.SOCIAL, E, "Единый стиль иконок", "Хорошо видны в круге", "Контраст с фоном"),
+              c(25, "Рекламный баннер кофейни", "Баннер для акции «второй кофе в подарок».", Category.ADS, E, "Один главный посыл", "Заметный призыв к действию", "Логотип на видном месте"),
+              c(26, "Креатив для приложения доставки", "Рекламный квадрат для мобильной ленты.", Category.ADS, M, "Выгода понятна за 2 секунды", "Продукт в фокусе", "Текст занимает не более 20% площади"),
+              c(27, "Билборд для бренда напитков", "Широкий макет для наружной рекламы.", Category.ADS, H, "Не более семи слов", "Читается издалека", "Сильный образ продукта"),
+              c(28, "Геометрический арт", "Композиция из простых фигур.", Category.ART, E, "Использованы не более пяти цветов", "Есть центр внимания", "Баланс пустоты и плотности"),
+              c(29, "Цифровой коллаж", "Коллаж из фрагментов фото и текстур.", Category.ART, M, "Единая цветокоррекция", "Слои с разной глубиной", "Понятная идея или тема"),
+              c(30, "Автопортрет в плоском стиле", "Иллюстрация себя из простых форм.", Category.ART, H, "Узнаваемые черты", "Плоские цвета без градиентов", "Продуманный фон")
+          )
+          EOF
+          cat > app/src/main/java/com/designchallenge30/data/Repository.kt <<'EOF'
+          package com.designchallenge30.data
+
+          import android.content.Context
+          import androidx.datastore.preferences.core.edit
+          import androidx.datastore.preferences.core.stringPreferencesKey
+          import androidx.datastore.preferences.core.stringSetPreferencesKey
+          import androidx.datastore.preferences.preferencesDataStore
+          import kotlinx.coroutines.flow.Flow
+          import kotlinx.coroutines.flow.map
+
+          private val Context.store by preferencesDataStore(name = "design30")
+
+          data class Saved(val done: Set<Int>, val checks: Set<String>, val works: List<String>)
+
+          class Repository(private val ctx: Context) {
+              private val doneKey = stringSetPreferencesKey("done")
+              private val checksKey = stringSetPreferencesKey("checks")
+              private val worksKey = stringPreferencesKey("works")
+
+              val saved: Flow<Saved> = ctx.store.data.map { p ->
+                  Saved(
+                      done = p[doneKey].orEmpty().mapNotNull { it.toIntOrNull() }.toSet(),
+                      checks = p[checksKey].orEmpty(),
+                      works = p[worksKey].orEmpty().split("|").filter { it.isNotBlank() }
+                  )
+              }
+
+              suspend fun setCheck(taskId: Int, index: Int, on: Boolean) {
+                  ctx.store.edit {
+                      val key = "$taskId:$index"
+                      val set = it[checksKey].orEmpty().toMutableSet()
+                      if (on) set.add(key) else set.remove(key)
+                      it[checksKey] = set
+                  }
+              }
+
+              suspend fun complete(taskId: Int) {
+                  ctx.store.edit { it[doneKey] = it[doneKey].orEmpty() + taskId.toString() }
+              }
+
+              suspend fun reset() {
+                  ctx.store.edit {
+                      it.remove(doneKey)
+                      it.remove(checksKey)
+                  }
+              }
+
+              suspend fun addWorks(names: List<String>) {
+                  ctx.store.edit {
+                      val old = it[worksKey].orEmpty().split("|").filter { s -> s.isNotBlank() }
+                      it[worksKey] = (names + old).joinToString("|")
+                  }
+              }
+
+              suspend fun removeWork(name: String) {
+                  ctx.store.edit {
+                      val old = it[worksKey].orEmpty().split("|").filter { s -> s.isNotBlank() && s != name }
+                      it[worksKey] = old.joinToString("|")
+                  }
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/designchallenge30/ui/AppNav.kt <<'EOF'
+          package com.designchallenge30.ui
+
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.filled.List as ListIcon
+          import androidx.compose.material.icons.filled.Home
+          import androidx.compose.material.icons.filled.Person
+          import androidx.compose.material.icons.filled.Star
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.NavigationBar
+          import androidx.compose.material3.NavigationBarItem
+          import androidx.compose.material3.NavigationBarItemDefaults
+          import androidx.compose.material3.Scaffold
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.vector.ImageVector
+          import androidx.lifecycle.compose.collectAsStateWithLifecycle
+          import androidx.lifecycle.viewmodel.compose.viewModel
+          import androidx.navigation.NavGraph.Companion.findStartDestination
+          import androidx.navigation.NavType
+          import androidx.navigation.compose.NavHost
+          import androidx.navigation.compose.composable
+          import androidx.navigation.compose.currentBackStackEntryAsState
+          import androidx.navigation.compose.rememberNavController
+          import androidx.navigation.navArgument
+
+          private data class Tab(val route: String, val label: String, val icon: ImageVector)
+
+          @Composable
+          fun AppNav(vm: AppViewModel = viewModel()) {
+              val saved by vm.state.collectAsStateWithLifecycle()
+              val s = saved ?: return
+              val nav = rememberNavController()
+              val entry by nav.currentBackStackEntryAsState()
+              val route = entry?.destination?.route
+              val tabs = listOf(
+                  Tab("home", "Главная", Icons.Filled.Home),
+                  Tab("tasks", "Задания", Icons.AutoMirrored.Filled.ListIcon),
+                  Tab("portfolio", "Портфолио", Icons.Filled.Star),
+                  Tab("profile", "Профиль", Icons.Filled.Person)
+              )
+              Scaffold(
+                  containerColor = MaterialTheme.colorScheme.background,
+                  bottomBar = {
+                      if (tabs.any { it.route == route }) {
+                          NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                              tabs.forEach { t ->
+                                  NavigationBarItem(
+                                      selected = route == t.route,
+                                      onClick = {
+                                          nav.navigate(t.route) {
+                                              popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                              launchSingleTop = true
+                                              restoreState = true
+                                          }
+                                      },
+                                      icon = { Icon(t.icon, contentDescription = t.label) },
+                                      label = { Text(t.label) },
+                                      colors = NavigationBarItemDefaults.colors(
+                                          selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                          selectedTextColor = MaterialTheme.colorScheme.primary,
+                                          indicatorColor = MaterialTheme.colorScheme.primary,
+                                          unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                          unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                      )
+                                  )
+                              }
+                          }
+                      }
+                  }
+              ) { pad ->
+                  NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
+                      composable("home") { HomeScreen(s) { nav.navigate("task/$it") } }
+                      composable("tasks") { TasksScreen(s) { nav.navigate("task/$it") } }
+                      composable(
+                          "task/{id}",
+                          arguments = listOf(navArgument("id") { type = NavType.IntType })
+                      ) { e ->
+                          val id = e.arguments?.getInt("id") ?: 1
+                          TaskScreen(id, s, vm::toggleCheck, vm::complete) { nav.popBackStack() }
+                      }
+                      composable("portfolio") { PortfolioScreen(s, vm.worksDir, vm::addWorks, vm::removeWork) }
+                      composable("profile") { ProfileScreen(s, vm::reset) }
+                  }
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/designchallenge30/ui/AppViewModel.kt <<'EOF'
+          package com.designchallenge30.ui
+
+          import android.app.Application
+          import android.net.Uri
+          import androidx.lifecycle.AndroidViewModel
+          import androidx.lifecycle.viewModelScope
+          import com.designchallenge30.data.Repository
+          import com.designchallenge30.data.Saved
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.flow.SharingStarted
+          import kotlinx.coroutines.flow.StateFlow
+          import kotlinx.coroutines.flow.stateIn
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+          import java.io.File
+
+          class AppViewModel(app: Application) : AndroidViewModel(app) {
+              private val repo = Repository(app)
+              val worksDir = File(app.filesDir, "works").apply { mkdirs() }
+
+              val state: StateFlow<Saved?> =
+                  repo.saved.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+              fun toggleCheck(taskId: Int, index: Int, on: Boolean) {
+                  viewModelScope.launch { repo.setCheck(taskId, index, on) }
+              }
+
+              fun complete(taskId: Int) {
+                  viewModelScope.launch { repo.complete(taskId) }
+              }
+
+              fun reset() {
+                  viewModelScope.launch { repo.reset() }
+              }
+
+              fun addWorks(uris: List<Uri>) {
+                  viewModelScope.launch {
+                      val names = withContext(Dispatchers.IO) {
+                          uris.mapIndexedNotNull { i, uri ->
+                              runCatching {
+                                  val name = "work_${System.currentTimeMillis()}_$i.jpg"
+                                  val input = getApplication<Application>().contentResolver.openInputStream(uri)!!
+                                  input.use { src -> File(worksDir, name).outputStream().use { src.copyTo(it) } }
+                                  name
+                              }.getOrNull()
+                          }
+                      }
+                      if (names.isNotEmpty()) repo.addWorks(names)
+                  }
+              }
+
+              fun removeWork(name: String) {
+                  viewModelScope.launch {
+                      repo.removeWork(name)
+                      withContext(Dispatchers.IO) { File(worksDir, name).delete() }
+                  }
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/designchallenge30/ui/Screens.kt <<'EOF'
+          package com.designchallenge30.ui
+
+          import android.graphics.BitmapFactory
+          import androidx.activity.compose.rememberLauncherForActivityResult
+          import androidx.activity.result.PickVisualMediaRequest
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.compose.foundation.Image
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.aspectRatio
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.lazy.LazyColumn
+          import androidx.compose.foundation.lazy.LazyRow
+          import androidx.compose.foundation.lazy.grid.GridCells
+          import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+          import androidx.compose.foundation.lazy.grid.items as gridItems
+          import androidx.compose.foundation.lazy.items
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.filled.ArrowBack
+          import androidx.compose.material.icons.filled.Add
+          import androidx.compose.material.icons.filled.Check
+          import androidx.compose.material.icons.filled.Delete
+          import androidx.compose.material3.AlertDialog
+          import androidx.compose.material3.Button
+          import androidx.compose.material3.ButtonDefaults
+          import androidx.compose.material3.Card
+          import androidx.compose.material3.CardDefaults
+          import androidx.compose.material3.Checkbox
+          import androidx.compose.material3.CheckboxDefaults
+          import androidx.compose.material3.FilterChip
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.IconButton
+          import androidx.compose.material3.LinearProgressIndicator
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.OutlinedButton
+          import androidx.compose.material3.Text
+          import androidx.compose.material3.TextButton
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.produceState
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.ImageBitmap
+          import androidx.compose.ui.graphics.asImageBitmap
+          import androidx.compose.ui.layout.ContentScale
+          import androidx.compose.ui.unit.dp
+          import com.designchallenge30.data.CHALLENGES
+          import com.designchallenge30.data.Category
+          import com.designchallenge30.data.Challenge
+          import com.designchallenge30.data.Saved
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.withContext
+          import java.io.File
+
+          private const val TOTAL = 30
+          private val CardShape = RoundedCornerShape(20.dp)
+
+          @Composable
+          private fun AppCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+              Card(
+                  modifier = modifier.fillMaxWidth(),
+                  shape = CardShape,
+                  colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+              ) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() } }
+          }
+
+          @Composable
+          private fun Tag(text: String) {
+              Text(
+                  text,
+                  style = MaterialTheme.typography.labelLarge,
+                  color = MaterialTheme.colorScheme.primary
+              )
+          }
+
+          @Composable
+          private fun Muted(text: String) =
+              Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+
+          // ---------- Главная ----------
+          @Composable
+          fun HomeScreen(s: Saved, onStart: (Int) -> Unit) {
+              val done = s.done.size
+              val current = CHALLENGES.firstOrNull { it.id !in s.done }
+              Column(
+                  Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+                  verticalArrangement = Arrangement.spacedBy(16.dp)
+              ) {
+                  Tag("DESIGN CHALLENGE 30")
+                  Text("$done/$TOTAL", style = MaterialTheme.typography.displayLarge)
+                  LinearProgressIndicator(
+                      progress = { done / TOTAL.toFloat() },
+                      modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                      color = MaterialTheme.colorScheme.primary,
+                      trackColor = MaterialTheme.colorScheme.surfaceVariant
+                  )
+                  Muted("заданий выполнено")
+                  if (current != null) {
+                      AppCard {
+                          Tag("ТЕКУЩЕЕ ЗАДАНИЕ №${current.id}")
+                          Text(current.title, style = MaterialTheme.typography.headlineLarge)
+                          Muted(current.description)
+                          Muted("${current.category.title} · ${current.difficulty.title}")
+                          Button(
+                              onClick = { onStart(current.id) },
+                              modifier = Modifier.fillMaxWidth().height(52.dp),
+                              colors = ButtonDefaults.buttonColors(
+                                  containerColor = MaterialTheme.colorScheme.primary,
+                                  contentColor = MaterialTheme.colorScheme.onPrimary
+                              )
+                          ) { Text(if (done == 0) "Начать" else "Продолжить") }
+                      }
+                  } else {
+                      AppCard {
+                          Text("Все 30 заданий выполнены!", style = MaterialTheme.typography.headlineLarge)
+                          Muted("Загляните в «Портфолио» и добавьте свои лучшие работы.")
+                      }
+                  }
+              }
+          }
+
+          // ---------- Задания ----------
+          @Composable
+          fun TasksScreen(s: Saved, onOpen: (Int) -> Unit) {
+              var cat by remember { mutableStateOf<Category?>(null) }
+              val list = CHALLENGES.filter { cat == null || it.category == cat }
+              Column(Modifier.fillMaxSize().padding(top = 20.dp)) {
+                  Text("Задания", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(horizontal = 20.dp))
+                  LazyRow(
+                      contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                      horizontalArrangement = Arrangement.spacedBy(8.dp)
+                  ) {
+                      item { FilterChip(selected = cat == null, onClick = { cat = null }, label = { Text("Все") }) }
+                      items(Category.entries.toList()) { c ->
+                          FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c.title) })
+                      }
+                  }
+                  LazyColumn(
+                      contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                      verticalArrangement = Arrangement.spacedBy(12.dp)
+                  ) {
+                      items(list, key = { it.id }) { ch ->
+                          Card(
+                              modifier = Modifier.fillMaxWidth().clickable { onOpen(ch.id) },
+                              shape = CardShape,
+                              colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                          ) {
+                              Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                      Tag("№${ch.id} · ${ch.category.title.uppercase()}")
+                                      Text(ch.title, style = MaterialTheme.typography.titleLarge)
+                                      Muted("Сложность: ${ch.difficulty.title}")
+                                  }
+                                  if (ch.id in s.done) {
+                                      Icon(Icons.Filled.Check, "Выполнено", tint = MaterialTheme.colorScheme.primary)
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          // ---------- Экран задания ----------
+          @Composable
+          fun TaskScreen(
+              id: Int,
+              s: Saved,
+              onCheck: (Int, Int, Boolean) -> Unit,
+              onComplete: (Int) -> Unit,
+              onBack: () -> Unit
+          ) {
+              val ch: Challenge = CHALLENGES.firstOrNull { it.id == id } ?: return
+              val isDone = id in s.done
+              val allChecked = ch.criteria.indices.all { "$id:$it" in s.checks }
+              Column(
+                  Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+                  verticalArrangement = Arrangement.spacedBy(16.dp)
+              ) {
+                  IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") }
+                  Tag("ЗАДАНИЕ №${ch.id} · ${ch.category.title.uppercase()}")
+                  Text(ch.title, style = MaterialTheme.typography.headlineLarge)
+                  Muted("Сложность: ${ch.difficulty.title}")
+                  Text(ch.description, style = MaterialTheme.typography.bodyLarge)
+                  AppCard {
+                      Text("Критерии выполнения", style = MaterialTheme.typography.titleLarge)
+                      ch.criteria.forEachIndexed { i, text ->
+                          val checked = "$id:$i" in s.checks
+                          Row(
+                              Modifier.fillMaxWidth().clickable(enabled = !isDone) { onCheck(id, i, !checked) },
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
+                              Checkbox(
+                                  checked = checked,
+                                  onCheckedChange = if (isDone) null else { v -> onCheck(id, i, v) },
+                                  colors = CheckboxDefaults.colors(
+                                      checkedColor = MaterialTheme.colorScheme.primary,
+                                      checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                                  )
+                              )
+                              Text(text, style = MaterialTheme.typography.bodyLarge)
+                          }
+                      }
+                  }
+                  if (isDone) {
+                      Text("Задание завершено ✓", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
+                  } else {
+                      Button(
+                          onClick = { onComplete(id) },
+                          enabled = allChecked,
+                          modifier = Modifier.fillMaxWidth().height(52.dp),
+                          colors = ButtonDefaults.buttonColors(
+                              containerColor = MaterialTheme.colorScheme.primary,
+                              contentColor = MaterialTheme.colorScheme.onPrimary
+                          )
+                      ) { Text("Завершить") }
+                      if (!allChecked) Muted("Отметьте все критерии, чтобы завершить задание.")
+                  }
+              }
+          }
+
+          // ---------- Портфолио ----------
+          private fun decode(f: File, max: Int = 600): ImageBitmap? {
+              val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+              BitmapFactory.decodeFile(f.path, bounds)
+              var sample = 1
+              while (bounds.outWidth / (sample * 2) >= max) sample *= 2
+              val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+              return BitmapFactory.decodeFile(f.path, opts)?.asImageBitmap()
+          }
+
+          @Composable
+          private fun WorkImage(file: File, modifier: Modifier) {
+              val bmp by produceState<ImageBitmap?>(null, file) {
+                  value = withContext(Dispatchers.IO) { runCatching { decode(file) }.getOrNull() }
+              }
+              val b = bmp
+              if (b != null) {
+                  Image(b, "Моя работа", modifier, contentScale = ContentScale.Crop)
+              } else {
+                  Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
+              }
+          }
+
+          @Composable
+          fun PortfolioScreen(
+              s: Saved,
+              dir: File,
+              onAdd: (List<android.net.Uri>) -> Unit,
+              onRemove: (String) -> Unit
+          ) {
+              val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
+                  if (uris.isNotEmpty()) onAdd(uris)
+              }
+              Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                  Text("Мои работы", style = MaterialTheme.typography.headlineLarge)
+                  Button(
+                      onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                      modifier = Modifier.fillMaxWidth().height(52.dp),
+                      colors = ButtonDefaults.buttonColors(
+                          containerColor = MaterialTheme.colorScheme.primary,
+                          contentColor = MaterialTheme.colorScheme.onPrimary
+                      )
+                  ) {
+                      Icon(Icons.Filled.Add, null)
+                      Text("  Добавить работы")
+                  }
+                  if (s.works.isEmpty()) {
+                      Muted("Пока пусто. Добавьте изображения из галереи — они сохранятся в приложении.")
+                  } else {
+                      LazyVerticalGrid(
+                          columns = GridCells.Fixed(2),
+                          horizontalArrangement = Arrangement.spacedBy(12.dp),
+                          verticalArrangement = Arrangement.spacedBy(12.dp),
+                          modifier = Modifier.weight(1f)
+                      ) {
+                          gridItems(s.works, key = { it }) { name ->
+                              Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(16.dp))) {
+                                  WorkImage(File(dir, name), Modifier.fillMaxSize())
+                                  IconButton(
+                                      onClick = { onRemove(name) },
+                                      modifier = Modifier.align(Alignment.TopEnd)
+                                  ) { Icon(Icons.Filled.Delete, "Удалить", tint = MaterialTheme.colorScheme.primary) }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          // ---------- Профиль / статистика ----------
+          @Composable
+          fun ProfileScreen(s: Saved, onReset: () -> Unit) {
+              val done = s.done.size
+              var confirm by remember { mutableStateOf(false) }
+              Column(
+                  Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+                  verticalArrangement = Arrangement.spacedBy(16.dp)
+              ) {
+                  Text("Профиль", style = MaterialTheme.typography.headlineLarge)
+                  AppCard {
+                      Tag("ПРОГРЕСС")
+                      Text("${done * 100 / TOTAL}%", style = MaterialTheme.typography.displayLarge)
+                      Muted("Завершено заданий: $done из $TOTAL")
+                      Muted("Осталось: ${TOTAL - done}")
+                  }
+                  AppCard {
+                      Tag("ПОРТФОЛИО")
+                      Text("${s.works.size}", style = MaterialTheme.typography.headlineLarge)
+                      Muted("сохранённых работ")
+                  }
+                  OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                      Text("Сбросить прогресс")
+                  }
+              }
+              if (confirm) {
+                  AlertDialog(
+                      onDismissRequest = { confirm = false },
+                      title = { Text("Сбросить прогресс?") },
+                      text = { Text("Отметки заданий будут удалены. Работы в портфолио останутся.") },
+                      confirmButton = { TextButton(onClick = { onReset(); confirm = false }) { Text("Сбросить") } },
+                      dismissButton = { TextButton(onClick = { confirm = false }) { Text("Отмена") } }
+                  )
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/designchallenge30/ui/theme/Theme.kt <<'EOF'
+          package com.designchallenge30.ui.theme
+
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Typography
+          import androidx.compose.material3.darkColorScheme
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.TextStyle
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.sp
+
+          val Graphite = Color(0xFF16181B)
+          val Surface1 = Color(0xFF1F2226)
+          val Surface2 = Color(0xFF2A2E33)
+          val Acid = Color(0xFFB6FF3B)
+
+          private val Colors = darkColorScheme(
+              primary = Acid,
+              onPrimary = Color(0xFF10130A),
+              background = Graphite,
+              onBackground = Color(0xFFF2F4F5),
+              surface = Surface1,
+              onSurface = Color(0xFFF2F4F5),
+              surfaceVariant = Surface2,
+              onSurfaceVariant = Color(0xFF9BA1A8),
+              secondaryContainer = Surface2,
+              onSecondaryContainer = Acid
+          )
+
+          private val Type = Typography(
+              displayLarge = TextStyle(fontSize = 80.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp),
+              headlineLarge = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp),
+              titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+              bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
+              labelLarge = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+          )
+
+          @Composable
+          fun DesignTheme(content: @Composable () -> Unit) {
+              MaterialTheme(colorScheme = Colors, typography = Type, content = content)
+          }
+          EOF
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">Design Challenge 30</string>
+          </resources>
+          EOF
+          cat > app/src/main/res/values/themes.xml <<'EOF'
+          <resources>
+              <style name="Theme.DesignChallenge30" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#16181B</item>
+                  <item name="android:statusBarColor">#16181B</item>
+                  <item name="android:navigationBarColor">#1F2226</item>
+              </style>
+          </resources>
+          EOF
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              alias(libs.plugins.android.application) apply false
+              alias(libs.plugins.kotlin.android) apply false
+              alias(libs.plugins.kotlin.compose) apply false
+          }
+          EOF
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          EOF
+          cat > gradle/libs.versions.toml <<'EOF'
+          [versions]
+          agp = "8.5.2"
+          kotlin = "2.0.20"
+          composeBom = "2024.09.03"
+          coreKtx = "1.13.1"
+          lifecycle = "2.8.6"
+          activityCompose = "1.9.2"
+          navigation = "2.8.0"
+          datastore = "1.1.1"
+
+          [libraries]
+          androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+          androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+          androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+          androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+          androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+          androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+          androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+          androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+          androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+          [plugins]
+          android-application = { id = "com.android.application", version.ref = "agp" }
+          kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+          kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+          EOF
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "DesignChallenge30"
+          include(":app")
+          EOF
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DesignChallenge30-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
